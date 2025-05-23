@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Prediction Result</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #ffe6f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        h1 {
+            color: white;
+            background-color: #ff66b3;
+            padding: 10px;
+            width: 100%;
+            text-align: center;
+            position: fixed;
+            top: 0;
+            margin: 0;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            margin-top: 60px;
+        }
+        .error {
+            color: red;
+        }
+        button {
+            background-color: #ff66b3;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        button:hover {
+            background-color: #e65c9e;
+        }
+    </style>
+</head>
+<body>
+    <h1>Breast Cancer Risk Estimation</h1>
+    <div class="container">
+        <h2>Prediction Result</h2>
+        {% if probability is defined %}
+            <p>The estimated probability of breast cancer risk is {{ probability }}%.</p>
+        {% elif error %}
+            <p class="error">{{ error }}</p>
+        {% else %}
+            <p class="error">No prediction available.</p>
+        {% endif %}
+        <a href="/"><button>Back to Input Form</button></a>
+    </div>
+</body>
+</html>
