@@ -37,7 +37,7 @@ encoding_maps = {
 # Load trained model
 @st.cache_resource
 def load_categorical_model():
-    return joblib.load(r"C:\Users\mahmo\OneDrive\Desktop\pro1\templates/full_model.pkl")
+    return joblib.load(r"templates/full_model.pkl")
 
 # ---- MODEL LOADING FUNCTIONS (Diagnosis) ----
 
