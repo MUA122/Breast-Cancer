@@ -118,7 +118,7 @@ def generate_gradcam(img, model):
 def main():
     st.set_page_config(page_title="Breast Cancer AI Tool", layout="wide")
     st.title("AI-Powered Breast Cancer Care Cycle 🩺")
-    choice = st.radio("Choose a module", ["Categorical", "X-AI"])
+    choice = st.radio("Choose a module", ["Risk Estimation", "X-AI"])
     if choice == "Risk Estimation":
         categorical_section()
     elif choice == "X-AI":
