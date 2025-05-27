@@ -119,7 +119,7 @@ def main():
     st.set_page_config(page_title="Breast Cancer AI Tool", layout="wide")
     st.title("AI-Powered Breast Cancer Care Cycle 🩺")
     choice = st.radio("Choose a module", ["Categorical", "X-AI"])
-    if choice == "Categorical":
+    if choice == "Risk Estimation":
         categorical_section()
     elif choice == "X-AI":
         xai_section()
