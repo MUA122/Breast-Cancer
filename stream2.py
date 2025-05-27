@@ -3,24 +3,20 @@ import joblib
 import numpy as np
 import pandas as pd
 from PIL import Image
-from keras.models import load_model
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
+import matplotlib.pyplot as plt
+import tensorflow as tf
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input, decode_predictions
+from tensorflow.keras.preprocessing import image as keras_image
+from tensorflow.keras.models import Model
 
-# Hardcoded column names (from index.html/app.py logic)
+# ----------------------------- Shared Constants -----------------------------
 model_columns = [
-    'age_group_5_years',
-    'race_eth',
-    'first_degree_hx',
-    'age_menarche',
-    'age_first_birth',
-    'BIRADS_breast_density',
-    'current_hrt',
-    'menopaus',
-    'bmi_group',
-    'biophx'
+    'age_group_5_years', 'race_eth', 'first_degree_hx', 'age_menarche',
+    'age_first_birth', 'BIRADS_breast_density', 'current_hrt',
+    'menopaus', 'bmi_group', 'biophx'
 ]
 
-# Encoding mappings
 encoding_maps = {
     'age_group_5_years': lambda x: min(max(int(float(x) - 19) // 5, 1), 11),
     'race_eth': {'White': 1, 'Black': 2, 'Hispanic': 3, 'Asian': 4, 'Other': 5, 'Unknown': 6},
@@ -34,85 +30,16 @@ encoding_maps = {
     'biophx': {'No': 0, 'Yes': 1}
 }
 
-# Load trained model
+# ----------------------------- Caching -----------------------------
 @st.cache_resource
 def load_categorical_model():
     return joblib.load(r"templates/full_model.pkl")
 
-# ---- MODEL LOADING FUNCTIONS (Diagnosis) ----
-
 @st.cache_resource
-def load_xray_models():
-    TRAIN_DIR = r'C:\Users\mahmo\OneDrive\Desktop\pro1\Breast Cancer Dataset\training'
-    gen = ImageDataGenerator(rescale=1/255.0)
-    train_data = gen.flow_from_directory(TRAIN_DIR, target_size=(240, 240), batch_size=64, class_mode='categorical')
-    class_map = {v: k for k, v in train_data.class_indices.items()}
-    return {
-        "MobileNetV2": (load_model("MobileNetV2_modelx2.h5"), 0.9781),
-        "ResNet50":    (load_model("ResNet50_modelx2.h5"), 0.8925),
-        "DenseNet169": (load_model("DenseNet169_modelx2.h5"), 0.9770)
-    }, class_map
+def load_xai_model():
+    return MobileNetV2(weights="imagenet")
 
-@st.cache_resource
-def load_microscopic_models():
-    TRAIN_DIR = r'C:\Users\mahmo\OneDrive\Desktop\pro1\dataset_cancer_v1\classificacao_binaria\trainig'
-    gen = ImageDataGenerator(rescale=1/255.0)
-    train_data = gen.flow_from_directory(TRAIN_DIR, target_size=(240, 240), batch_size=64, class_mode='categorical')
-    class_map = {v: k for k, v in train_data.class_indices.items()}
-    return {
-        "DenseNet169": (load_model("DenseNet169_model.h5"), 0.9674),
-        "MobileNetV2": (load_model("MobileNetV2_model.h5"), 0.8546),
-        "ResNet50":    (load_model("ResNet50_model.h5"), 0.7243)
-    }, class_map
-
-@st.cache_resource
-def load_skin_models():
-    TRAIN_DIR = r'C:\Users\mahmo\OneDrive\Desktop\pro1\skin\melanoma_cancer_dataset\train'
-    gen = ImageDataGenerator(rescale=1/255.0)
-    train_data = gen.flow_from_directory(TRAIN_DIR, target_size=(224, 224), batch_size=64, class_mode='categorical')
-    class_map = {v: k for k, v in train_data.class_indices.items()}
-    return {
-        "InceptionV3":  (load_model("InceptionV3_model_skin.h5"), 0.902),
-        "DenseNet201":  (load_model("DenseNet201_model_skin.h5"), 0.911)
-    }, class_map
-
-@st.cache_resource
-def load_all_datasets():
-    xray, cm_x = load_xray_models()
-    micro, cm_m = load_microscopic_models()
-    skin, cm_s = load_skin_models()
-    return {
-        "X-Ray":       (xray, cm_x),
-        "Microscopic": (micro, cm_m),
-        "Skin Cancer": (skin, cm_s)
-    }
-
-def predict_image(model, img: Image.Image, class_map):
-    shape = model.input_shape
-    if isinstance(shape, list): shape = shape[0]
-    _, H, W, _ = shape
-    img_resized = img.resize((W, H))
-    arr = np.asarray(img_resized) / 255.0
-    arr = np.expand_dims(arr, axis=0)
-    preds = model.predict(arr)
-    return class_map[np.argmax(preds, axis=1)[0]]
-
-def diagnosis_section():
-    st.header("Diagnosis Interface")
-    datasets = load_all_datasets()
-    dataset_name = st.selectbox("Select Dataset Type", list(datasets.keys()))
-    model_dict, class_map = datasets[dataset_name]
-    model_name = st.selectbox("Select Model", list(model_dict.keys()))
-    model, accuracy = model_dict[model_name]
-    st.markdown(f"**Current Model Accuracy:** {accuracy*100:.2f}%")
-    uploaded_file = st.file_uploader("Upload an image", type=["jpg","jpeg","png","bmp","tiff"])
-    if uploaded_file:
-        img = Image.open(uploaded_file)
-        st.image(img, caption="Input Image", use_container_width=True)
-        if st.button("Predict"):
-            label = predict_image(model, img, class_map)
-            st.success(f"**Prediction:** {label}")
-
+# ----------------------------- Sections -----------------------------
 def categorical_section():
     st.header("Categorical Risk Estimation")
     model = load_categorical_model()
@@ -140,13 +67,62 @@ def categorical_section():
             except Exception as e:
                 st.error(f"Error during prediction: {e}")
 
+def xai_section():
+    st.header("Explainable AI (XAI) 🔍")
+    model = load_xai_model()
+
+    uploaded_file = st.file_uploader("📤 Upload an image for XAI", type=["jpg", "jpeg", "png"])
+    if uploaded_file:
+        img = Image.open(uploaded_file).convert("RGB")
+        st.image(img, caption="Original Image", use_container_width=True)
+
+        if st.button("Generate XAI"):
+            with st.spinner("Generating Grad-CAM..."):
+                gradcam_img, prediction = generate_gradcam(img, model)
+                st.image(gradcam_img, caption=f"Prediction: {prediction[1]} ({prediction[2]*100:.2f}%)", use_container_width=True)
+
+def generate_gradcam(img, model):
+    img_resized = img.resize((224, 224))
+    x = keras_image.img_to_array(img_resized)
+    x = np.expand_dims(x, axis=0)
+    x = preprocess_input(x)
+
+    preds = model.predict(x)
+    class_idx = np.argmax(preds[0])
+    last_conv_layer = model.get_layer("Conv_1")
+    grad_model = Model(inputs=model.input, outputs=[last_conv_layer.output, model.output])
+
+    with tf.GradientTape() as tape:
+        conv_outputs, predictions = grad_model(x)
+        class_channel = predictions[:, class_idx]
+
+    grads = tape.gradient(class_channel, conv_outputs)[0]
+    pooled_grads = tf.reduce_mean(grads, axis=(0, 1))
+    conv_outputs = conv_outputs[0]
+    heatmap = tf.reduce_sum(tf.multiply(pooled_grads, conv_outputs), axis=-1)
+    heatmap = np.maximum(heatmap, 0)
+    heatmap /= np.max(heatmap) if np.max(heatmap) != 0 else 1
+    heatmap = np.uint8(255 * heatmap)
+
+    heatmap = Image.fromarray(heatmap).resize((224, 224))
+    heatmap = np.array(heatmap)
+    heatmap = np.uint8(plt.cm.jet(heatmap / 255.0)[:, :, :3] * 255)
+
+    original_img = np.array(img_resized).astype("uint8")
+    superimposed_img = 0.6 * original_img + 0.4 * heatmap
+    superimposed_img = np.uint8(superimposed_img)
+
+    return superimposed_img, decode_predictions(preds, top=1)[0][0]
+
+# ----------------------------- Main -----------------------------
 def main():
-    st.title("AI-Powered Breast cancer care cycle🩺")
-    choice = st.radio("Choose a module", ["Diagnosis", "Categorical"])
-    if choice == "Diagnosis":
-        diagnosis_section()
-    elif choice == "Categorical":
+    st.set_page_config(page_title="Breast Cancer AI Tool", layout="wide")
+    st.title("AI-Powered Breast Cancer Care Cycle 🩺")
+    choice = st.radio("Choose a module", ["Categorical", "X-AI"])
+    if choice == "Categorical":
         categorical_section()
+    elif choice == "X-AI":
+        xai_section()
 
 if __name__ == "__main__":
     main()
